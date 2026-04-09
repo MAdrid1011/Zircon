@@ -6,72 +6,60 @@ import TLB_Struct._
 
 
 import CPU_Config._
+
+// ── LA32RSim-2026 commit port (one per commit slot) ─────────────────────────
+class LA32RSim_CmtPort extends Bundle {
+    val valid          = Bool()
+    val pc             = UInt(32.W)
+    val inst           = UInt(32.W)
+    val rd_valid       = Bool()
+    val rd             = UInt(5.W)
+    val exception      = Bool()
+    val exception_code = UInt(7.W)
+}
+
 class CPU_IO extends Bundle{
-    val araddr                      = Output(UInt(32.W))
-    val arburst                     = Output(UInt(2.W))
-    val arid                        = Output(UInt(4.W))
-    val arlen                       = Output(UInt(8.W))  
-    val arready                     = Input(Bool())
-    val arsize                      = Output(UInt(3.W))
-    val arvalid                     = Output(Bool())
-    val awaddr                      = Output(UInt(32.W))
-    val awburst                     = Output(UInt(2.W))
-    val awid                        = Output(UInt(4.W))
-    val awlen                       = Output(UInt(8.W))
-    val awready                     = Input(Bool())
-    val awsize                      = Output(UInt(3.W))
-    val awvalid                     = Output(Bool())
-    val bid                         = Input(UInt(4.W))
-    val bready                      = Output(Bool())
-    val bresp                       = Input(UInt(2.W))
-    val bvalid                      = Input(Bool())
-    val rdata                       = Input(UInt(32.W))
-    val rid                         = Input(UInt(4.W))
-    val rlast                       = Input(Bool())
-    val rready                      = Output(Bool())
-    val rresp                       = Input(UInt(2.W))
-    val rvalid                      = Input(Bool())
-    val wdata                       = Output(UInt(32.W))
-    val wlast                       = Output(Bool())
-    val wready                      = Input(Bool())
-    val wstrb                       = Output(UInt(4.W))
-    val wvalid                      = Output(Bool())
+    // ── AXI signals (renamed to match LA32RSim-2026 Memory.cc) ──────────────
+    // AR channel
+    val axi_ar_valid                = Output(Bool())
+    val axi_ar_ready                = Input(Bool())
+    val axi_ar_addr                 = Output(UInt(32.W))
+    val axi_ar_len                  = Output(UInt(8.W))
+    val axi_ar_size                 = Output(UInt(3.W))
+    val axi_ar_burst                = Output(UInt(2.W))
+    val axi_ar_id                   = Output(UInt(4.W))
+    // R channel
+    val axi_r_valid                 = Input(Bool())
+    val axi_r_ready                 = Output(Bool())
+    val axi_r_data                  = Input(UInt(32.W))
+    val axi_r_last                  = Input(Bool())
+    val axi_r_resp                  = Input(UInt(2.W))
+    val axi_r_id                    = Input(UInt(4.W))
+    // AW channel
+    val axi_aw_valid                = Output(Bool())
+    val axi_aw_ready                = Input(Bool())
+    val axi_aw_addr                 = Output(UInt(32.W))
+    val axi_aw_len                  = Output(UInt(8.W))
+    val axi_aw_size                 = Output(UInt(3.W))
+    val axi_aw_burst                = Output(UInt(2.W))
+    val axi_aw_id                   = Output(UInt(4.W))
+    // W channel
+    val axi_w_valid                 = Output(Bool())
+    val axi_w_ready                 = Input(Bool())
+    val axi_w_data                  = Output(UInt(32.W))
+    val axi_w_strb                  = Output(UInt(4.W))
+    val axi_w_last                  = Output(Bool())
+    // B channel
+    val axi_b_valid                 = Input(Bool())
+    val axi_b_ready                 = Output(Bool())
+    val axi_b_resp                  = Input(UInt(2.W))
+    val axi_b_id                    = Input(UInt(4.W))
 
-    // debug
-    val commit_en                   = Output(Vec(2, Bool()))
-    val commit_rd                   = Output(Vec(2, UInt(5.W)))
-    val commit_prd                  = Output(Vec(2, UInt(log2Ceil(PREG_NUM).W)))
-    val commit_rd_valid             = Output(Vec(2, Bool()))
-    val commit_rf_wdata             = Output(Vec(2, UInt(32.W)))
-    val commit_csr_wdata            = Output(Vec(2, UInt(32.W)))
-    val commit_csr_we               = Output(Vec(2, Bool()))
-    val commit_csr_waddr            = Output(Vec(2, UInt(14.W)))
-    val commit_pc                   = Output(Vec(2, UInt(32.W)))
-    val commit_is_ucread            = Output(Vec(2, Bool()))
-    val commit_is_br                = Output(Vec(2, Bool()))
-    val commit_br_type              = Output(Vec(2, UInt(2.W)))
-    val commit_predict_fail         = Output(Vec(2, Bool()))
-    val commit_inst                 = Output(Vec(2, UInt(32.W)))
-    val commit_interrupt            = Output(Bool())
-    val commit_interrupt_type       = Output(UInt(13.W))
-
-    val commit_stall_by_fetch_queue = Output(Bool())
-    val commit_stall_by_rename      = Output(Bool())
-    val commit_stall_by_rob         = Output(Bool())
-    val commit_stall_by_iq          = Output(Vec(5, Bool()))
-    val commit_stall_by_sb          = Output(Bool())
-    val commit_stall_by_icache      = Output(Bool())
-    val commit_stall_by_div         = Output(Bool())
-    val commit_icache_miss          = Output(Bool())
-    val commit_icache_visit         = Output(Bool())
-    val commit_stall_by_dcache      = Output(Bool())
-    val commit_dcache_miss          = Output(Bool())
-    val commit_dcache_visit         = Output(Bool())
-    
-    val commit_iq_issue             = Output(Vec(5, Bool()))
-    val commit_tlbfill_en           = Output(Bool())
-    val commit_tlbfill_idx          = Output(UInt(4.W))
-
+    // ── LA32RSim-2026 commit interface ───────────────────────────────────────
+    // Vec(2) expands to io_cmt_0_valid, io_cmt_0_pc, … io_cmt_1_rd, …
+    val cmt                         = Output(Vec(2, new LA32RSim_CmtPort))
+    // Full architectural register file: io_cmt_rf_0 … io_cmt_rf_31
+    val cmt_rf                      = Output(Vec(32, UInt(32.W)))
 }
 class CPU extends Module {
     val io                          = IO(new CPU_IO)
@@ -720,118 +708,70 @@ class CPU extends Module {
     arb.io.d_wstrb                  := dcache.io.d_wstrb
     arb.io.d_bready                 := dcache.io.d_bready
     
-    
-    io.araddr                       := arb.io.araddr  
-    io.arburst                      := arb.io.arburst
-    io.arid                         := arb.io.arid
-    io.arlen                        := arb.io.arlen
-    arb.io.arready                  := io.arready
-    io.arsize                       := arb.io.arsize
-    io.arvalid                      := arb.io.arvalid
-    
-    io.awaddr                       := arb.io.awaddr
-    io.awburst                      := arb.io.awburst
-    io.awid                         := arb.io.awid
-    io.awlen                        := arb.io.awlen
-    arb.io.awready                  := io.awready
-    io.awsize                       := arb.io.awsize
-    io.awvalid                      := arb.io.awvalid
-    
-    arb.io.bid                      := io.bid
-    io.bready                       := arb.io.bready
-    arb.io.bresp                    := io.bresp
-    arb.io.bvalid                   := io.bvalid
-    
-    arb.io.rdata                    := io.rdata
-    arb.io.rid                      := io.rid
-    arb.io.rlast                    := io.rlast
-    io.rready                       := arb.io.rready
-    arb.io.rresp                    := io.rresp
-    arb.io.rvalid                   := io.rvalid
-    
-    io.wdata                        := arb.io.wdata
-    io.wlast                        := arb.io.wlast
-    arb.io.wready                   := io.wready
-    io.wstrb                        := arb.io.wstrb
-    io.wvalid                       := arb.io.wvalid
+    // ── AXI output assignments ──────────────────────────────────────────────
+    io.axi_ar_valid                 := arb.io.arvalid
+    io.axi_ar_addr                  := arb.io.araddr
+    io.axi_ar_burst                 := arb.io.arburst
+    io.axi_ar_id                    := arb.io.arid
+    io.axi_ar_len                   := arb.io.arlen
+    io.axi_ar_size                  := arb.io.arsize
+    arb.io.arready                  := io.axi_ar_ready
 
+    io.axi_aw_valid                 := arb.io.awvalid
+    io.axi_aw_addr                  := arb.io.awaddr
+    io.axi_aw_burst                 := arb.io.awburst
+    io.axi_aw_id                    := arb.io.awid
+    io.axi_aw_len                   := arb.io.awlen
+    io.axi_aw_size                  := arb.io.awsize
+    arb.io.awready                  := io.axi_aw_ready
 
-    // statitic
+    arb.io.bid                      := io.axi_b_id
+    io.axi_b_ready                  := arb.io.bready
+    arb.io.bresp                    := io.axi_b_resp
+    arb.io.bvalid                   := io.axi_b_valid
+
+    arb.io.rdata                    := io.axi_r_data
+    arb.io.rid                      := io.axi_r_id
+    arb.io.rlast                    := io.axi_r_last
+    io.axi_r_ready                  := arb.io.rready
+    arb.io.rresp                    := io.axi_r_resp
+    arb.io.rvalid                   := io.axi_r_valid
+
+    io.axi_w_data                   := arb.io.wdata
+    io.axi_w_last                   := arb.io.wlast
+    arb.io.wready                   := io.axi_w_ready
+    io.axi_w_strb                   := arb.io.wstrb
+    io.axi_w_valid                  := arb.io.wvalid
+
+    // ── Shadow ARF: updated at commit, slot 1 wins over slot 0 for same rd ─
+    val shadow_arf = RegInit(VecInit.fill(32)(0.U(32.W)))
+    for (i <- 0 until 2) {
+        when(rob.io.cmt_en(i) && rob.io.rd_valid_cmt(i) && rob.io.rd_cmt(i) =/= 0.U) {
+            shadow_arf(rob.io.rd_cmt(i)) := rob.io.rf_wdata_cmt(i)
+        }
+    }
+    io.cmt_rf := shadow_arf
+
+    // ── LA32RSim-2026 commit interface assignments ───────────────────────────
     if(System.getProperties().getProperty("mode") == "sim"){
-        io.commit_en                    := rob.io.cmt_en
-        io.commit_rd                    := rob.io.rd_cmt
-        io.commit_prd                   := rob.io.prd_cmt
-        io.commit_rd_valid              := rob.io.rd_valid_cmt
-        io.commit_rf_wdata              := rob.io.rf_wdata_cmt
-        io.commit_csr_wdata             := rob.io.csr_diff_wdata_cmt
-        io.commit_csr_we                := rob.io.csr_diff_we_cmt
-        io.commit_csr_waddr             := rob.io.csr_diff_addr_cmt
-        io.commit_pc                    := rob.io.pc_cmt
-        io.commit_is_ucread             := rob.io.is_ucread_cmt
-        io.commit_is_br                 := rob.io.is_br_stat
-        io.commit_br_type               := rob.io.br_type_stat
-        io.commit_predict_fail          := rob.io.predict_fail_stat
-        io.commit_inst                  := rob.io.inst_cmt
-        io.commit_interrupt             := rob.io.exception_cmt(7) && rob.io.exception_cmt(6, 0) === 0.U
-        io.commit_interrupt_type        := csr_rf.io.estat_13
-
-
-        io.commit_stall_by_fetch_queue  := fq.io.full
-        io.commit_stall_by_rename       := free_list.io.empty
-        io.commit_stall_by_rob          := rob.io.full(7)
-        io.commit_stall_by_iq           := VecInit(iq1.io.full, iq2.io.full, iq3.io.full, iq4.io.full, DontCare)
-        io.commit_stall_by_sb           := sb.io.full
-
-        io.commit_stall_by_icache       := icache.io.cache_miss_RM
-        io.commit_stall_by_dcache       := dcache.io.cache_miss_MEM(4)
-        io.commit_icache_miss           := icache.io.commit_icache_miss
-        io.commit_dcache_miss           := dcache.io.commit_dcache_miss
-        io.commit_icache_visit          := icache.io.commit_icache_visit
-        io.commit_dcache_visit          := dcache.io.commit_dcache_visit
-        io.commit_stall_by_div          := mdu.io.busy(21)
-
-        io.commit_iq_issue              := VecInit(sel1.io.inst_issue_valid, sel2.io.inst_issue_valid, sel3.io.inst_issue_valid, sel4.io.inst_issue_valid, DontCare)
-        io.commit_tlbfill_en            := rob.io.tlbfill_en_cmt
-        io.commit_tlbfill_idx           := stable_cnt.io.value(3, 0)
+        for (i <- 0 until 2) {
+            io.cmt(i).valid          := rob.io.cmt_en(i)
+            io.cmt(i).pc             := rob.io.pc_cmt(i)
+            io.cmt(i).inst           := rob.io.inst_cmt(i)
+            io.cmt(i).rd_valid       := rob.io.rd_valid_cmt(i)
+            io.cmt(i).rd             := rob.io.rd_cmt(i)
+            io.cmt(i).exception      := rob.io.exception_cmt(7)
+            io.cmt(i).exception_code := rob.io.exception_cmt(6, 0)
+        }
+    } else {
+        for (i <- 0 until 2) {
+            io.cmt(i).valid          := DontCare
+            io.cmt(i).pc             := DontCare
+            io.cmt(i).inst           := DontCare
+            io.cmt(i).rd_valid       := DontCare
+            io.cmt(i).rd             := DontCare
+            io.cmt(i).exception      := DontCare
+            io.cmt(i).exception_code := DontCare
+        }
     }
-    else {
-        io.commit_en                    := DontCare
-        io.commit_rd                    := DontCare
-        io.commit_prd                   := DontCare
-        io.commit_rd_valid              := DontCare
-        io.commit_rf_wdata              := DontCare
-        io.commit_csr_wdata             := DontCare
-        io.commit_csr_we                := DontCare
-        io.commit_csr_waddr             := DontCare
-        io.commit_pc                    := DontCare
-        io.commit_is_ucread             := DontCare
-        io.commit_is_br                 := DontCare
-        io.commit_br_type               := DontCare
-        io.commit_predict_fail          := DontCare
-        io.commit_inst                  := DontCare
-        io.commit_interrupt             := DontCare
-        io.commit_interrupt_type        := DontCare
-
-
-        io.commit_stall_by_fetch_queue  := DontCare
-        io.commit_stall_by_rename       := DontCare
-        io.commit_stall_by_rob          := DontCare
-        io.commit_stall_by_iq           := DontCare
-        io.commit_stall_by_sb           := DontCare
-
-        io.commit_stall_by_icache       := DontCare
-        io.commit_stall_by_dcache       := DontCare
-        io.commit_icache_miss           := DontCare
-        io.commit_dcache_miss           := DontCare
-        io.commit_icache_visit          := DontCare
-        io.commit_dcache_visit          := DontCare
-        io.commit_stall_by_div          := DontCare
-
-        io.commit_iq_issue              := DontCare
-        io.commit_tlbfill_en            := DontCare
-        io.commit_tlbfill_idx           := DontCare
-
-    }
-
 }
-
