@@ -1,4 +1,0 @@
-xilinx_simple_dual_port_1_clock_ram_read_first.sv
-xilinx_simple_dual_port_1_clock_ram_write_first.sv
-xilinx_simple_dual_port_byte_write_1_clock_ram_write_first.sv
-xilinx_single_port_ram_write_first.sv
