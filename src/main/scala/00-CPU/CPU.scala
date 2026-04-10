@@ -743,20 +743,24 @@ class CPU extends Module {
     io.axi_w_strb                   := arb.io.wstrb
     io.axi_w_valid                  := arb.io.wvalid
 
-    // ── Shadow ARF: updated at commit, slot 1 wins over slot 0 for same rd ─
-    val shadow_arf = RegInit(VecInit.fill(32)(0.U(32.W)))
+    // ── Shadow ARF: combinational next-value so cmt_rf is valid in same cycle
+    //   as cmt_en.  Slot 1 wins over slot 0 when both write the same rd.
+    val shadow_arf      = RegInit(VecInit.fill(32)(0.U(32.W)))
+    val shadow_arf_next = WireDefault(shadow_arf)
     for (i <- 0 until 2) {
         when(rob.io.cmt_en(i) && rob.io.rd_valid_cmt(i) && rob.io.rd_cmt(i) =/= 0.U) {
-            shadow_arf(rob.io.rd_cmt(i)) := rob.io.rf_wdata_cmt(i)
+            shadow_arf_next(rob.io.rd_cmt(i)) := rob.io.rf_wdata_cmt(i)
         }
     }
-    io.cmt_rf := shadow_arf
+    shadow_arf  := shadow_arf_next   // update on clock edge
+    io.cmt_rf   := shadow_arf_next   // combinational output: includes this cycle's commits
 
     // ── LA32RSim-2026 commit interface assignments ───────────────────────────
+    // Use inst_true_pc_cmt which always gives the instruction's own PC.
     if(System.getProperties().getProperty("mode") == "sim"){
         for (i <- 0 until 2) {
             io.cmt(i).valid          := rob.io.cmt_en(i)
-            io.cmt(i).pc             := rob.io.pc_cmt(i)
+            io.cmt(i).pc             := rob.io.inst_true_pc_cmt(i)
             io.cmt(i).inst           := rob.io.inst_cmt(i)
             io.cmt(i).rd_valid       := rob.io.rd_valid_cmt(i)
             io.cmt(i).rd             := rob.io.rd_cmt(i)

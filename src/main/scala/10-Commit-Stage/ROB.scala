@@ -103,6 +103,8 @@ class ROB_IO(n: Int) extends Bundle{
     val csr_diff_wdata_cmt      = Output(Vec(2, UInt(32.W)))
     val csr_diff_we_cmt         = Output(Vec(2, Bool()))
     val inst_cmt                = Output(Vec(2, UInt(32.W)))
+    // LA32RSim-2026: always the instruction's own PC (ROB stores pc+4, so subtract 4)
+    val inst_true_pc_cmt        = Output(Vec(2, UInt(32.W)))
 
     // stat
     val predict_fail_stat       = Output(Vec(2, Bool()))
@@ -337,4 +339,6 @@ class ROB(n: Int) extends Module{
     io.br_type_stat             := ShiftRegister(VecInit.tabulate(2)(i => rob(hsel_idx(i))(head_idx(i)).br_type_pred), 1)
     io.is_br_stat               := ShiftRegister(VecInit.tabulate(2)(i => rob(hsel_idx(i))(head_idx(i)).pred_update_en & cmt_en(i)), 1)
     io.inst_cmt                 := ShiftRegister(inst_cmt, 1)
+    // LA32RSim-2026: true instruction PC = stored_pc - 4
+    io.inst_true_pc_cmt         := ShiftRegister(VecInit.tabulate(2)(i => rob_commit_items(i).pc - 4.U), 1)
 } 
