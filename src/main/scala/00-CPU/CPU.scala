@@ -60,6 +60,10 @@ class CPU_IO extends Bundle{
     val cmt                         = Output(Vec(2, new LA32RSim_CmtPort))
     // Full architectural register file: io_cmt_rf_0 … io_cmt_rf_31
     val cmt_rf                      = Output(Vec(32, UInt(32.W)))
+    // TLBFILL synchronization: pulse valid when a TLBFILL commits,
+    // idx gives the stable_cnt-derived entry index used.
+    val cmt_tlbfill_valid           = Output(Bool())
+    val cmt_tlbfill_idx             = Output(UInt(log2Ceil(TLB_ENTRY_NUM).W))
 }
 class CPU extends Module {
     val io                          = IO(new CPU_IO)
@@ -544,6 +548,8 @@ class CPU extends Module {
     mmu.io.tlbwr_en                 := rob.io.tlbwr_en_cmt
     mmu.io.tlbfill_idx              := stable_cnt.io.value(3, 0)
     mmu.io.tlbfill_en               := rob.io.tlbfill_en_cmt
+    io.cmt_tlbfill_valid            := rob.io.tlbfill_en_cmt
+    io.cmt_tlbfill_idx              := stable_cnt.io.value(log2Ceil(TLB_ENTRY_NUM)-1, 0)
     mmu.io.invtlb_en                := rob.io.invtlb_en_cmt
     mmu.io.invtlb_op                := rob.io.invtlb_op_cmt
     mmu.io.invtlb_asid              := rob.io.invtlb_asid_cmt
